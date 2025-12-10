@@ -65,6 +65,7 @@ SkillSync is a skill-sharing platform where users can **learn new skills** by co
    ```
    MONGO_URI=your_mongodb_connection_string
    JWT_SECRET=your_jwt_secret
+   PORT=3000
    ```
 5. Start the development server:
    ```bash
