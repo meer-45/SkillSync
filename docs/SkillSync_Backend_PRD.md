@@ -16,12 +16,6 @@ The system implements **secure authentication, role-based access control**, and 
 
 ### 2. Target Users
 
-- **Learners:**  
-  Individuals looking to acquire new skills by offering to teach their existing expertise.
-
-- **Mentors:**  
-  Users who provide lessons in their area of expertise and earn tokens or credits to learn from others.
-
 - **Hybrid Users:**  
   Members who both teach and learn — engaging in two-way skill exchange.
 - **Admins:**  
@@ -174,9 +168,9 @@ The system implements **secure authentication, role-based access control**, and 
 **Matchmaking Routes** (`/api/v1/match/`)
 
 - `GET /suggested` – Fetch AI-based match suggestions (secured)
-- `POST /request` – Send match request to another user
-- `PUT /accept/:id` – Accept a match request
-- `DELETE /reject/:id` – Reject a match
+- `POST /request` – Send match request to another user (secured)
+- `PUT /accept/:id` – Accept a match request(secured)
+- `DELETE /reject/:id` – Reject a match(secured)
 
 **Session Routes** (`/api/v1/sessions/`)
 
@@ -188,9 +182,9 @@ The system implements **secure authentication, role-based access control**, and 
 
 **Wallet Routes** (`/api/v1/wallet/`)
 
-- `GET /` – Get user wallet details
-- `POST /transfer` – Send tokens to another user
-- `POST /reward` – Admin rewards/adjustments
+- `GET /` – Get user wallet details (secured)
+- `POST /transfer` – Send tokens to another user (secured)
+- `POST /reward` – Admin rewards/adjustments (Admin only)
 
 **Feedback Routes** (`/api/v1/feedback/`)
 
@@ -282,7 +276,7 @@ The system implements **secure authentication, role-based access control**, and 
   "toUser": "ObjectId",
   "amount": "Number",
   "timestamp": "Date",
-  "type": "earn | spend | transfer"
+  "transactionType": "earn | spend | transfer"
 }
 ```
 
