@@ -16,6 +16,7 @@ import {
   userForgotPasswordValidator,
   userLoginValidator,
   userRegisterValidator,
+  userResetForgotPassword,
 } from "../validators/index.js";
 import { verifyUserJWT } from "../middlewares/auth.middleware.js";
 
@@ -31,7 +32,7 @@ router
 
 router
   .route("/reset-password/:token")
-  .post(userForgotPasswordValidator(), validate, resetPassword);
+  .post(userResetForgotPassword(), validate, resetPassword);
 
 //secured routes
 router.route("/logout").post(verifyUserJWT, logoutUser);

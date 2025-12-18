@@ -1,10 +1,10 @@
 // feedback.controller.js
-import { body } from "express-validator";
+
 import {
   createFeedbackService,
   getUserFeedbacksService,
   deleteFeedbackService,
-} from "../services/feedbacks.services.js";
+} from "../services/feedbacks.service.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { asyncHandlers } from "../utils/async-handlers.js";
 
@@ -16,7 +16,12 @@ const createFeedback = asyncHandlers(async (req, res) => {
   const { toUser, rating, comment } = req.body;
   const fromUser = req.user?._id;
 
-  const feedback = await createFeedbackService(fromUser, toUser, rating, comment);
+  const feedback = await createFeedbackService(
+    fromUser,
+    toUser,
+    rating,
+    comment,
+  );
 
   res
     .status(201)
@@ -28,15 +33,20 @@ const createFeedback = asyncHandlers(async (req, res) => {
  */
 
 const getAllFeedback = asyncHandlers(async (req, res) => {
-  const {id} = req.params;
-  
+  const { id } = req.params;
 
   const { sentFeedbacks, receivedFeedbacks } =
     await getUserFeedbacksService(id);
 
-  res.status(200).json(
-    new ApiResponse(200, { sentFeedbacks, receivedFeedbacks }, "Feedbacks fetched successfully")
-  );
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { sentFeedbacks, receivedFeedbacks },
+        "Feedbacks fetched successfully",
+      ),
+    );
 });
 
 /**
@@ -46,7 +56,6 @@ const getAllFeedback = asyncHandlers(async (req, res) => {
 const deleteFeedback = asyncHandlers(async (req, res) => {
   const { id } = req.params;
   const user = req.user;
-
 
   await deleteFeedbackService(id, user);
 

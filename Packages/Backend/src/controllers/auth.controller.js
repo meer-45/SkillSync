@@ -12,6 +12,7 @@ import {
 } from "../services/auth.service.js";
 import { asyncHandlers } from "../utils/async-handlers.js";
 import { ApiResponse } from "../utils/api-response.js";
+import { ApiError } from "../utils/api-error.js";
 
 const registerUser = asyncHandlers(async (req, res) => {
   const user = await createUser(req.body, req);
@@ -93,7 +94,13 @@ const forgotPassword = asyncHandlers(async (req, res) => {
 });
 
 const resetPassword = asyncHandlers(async (req, res) => {
-  const { token, newPassword } = req.body;
+  const { confirmNewPassword, newPassword } = req.body;
+  const { token } = req.params;
+
+  if (newPassword != confirmNewPassword) {
+    throw new ApiError(405, "Passwords don't match");
+  }
+
   await resetForgotPassword(token, newPassword);
   res.status(200).json(new ApiResponse(true, "Password reset successfully"));
 });
