@@ -6,30 +6,33 @@ const userRegisterValidator = () => {
     body("email")
       .trim()
       .notEmpty()
-      .withMessage("Email is a required field")
+      .withMessage("Email is required")
       .isEmail()
-      .withMessage("Email is not valid"),
+      .withMessage("Please enter a valid email address"),
     body("username")
       .trim()
       .notEmpty()
-      .withMessage("Username is a required field")
+      .withMessage("Username is required")
       .isLowercase()
-      .withMessage("Username needs to be in lowercase")
+      .withMessage("Username must be lowercase")
       .isLength({ min: 3 })
-      .withMessage("Username needs to atleast 3 characters long"),
+      .withMessage("Username must be atleast 3 characters long"),
     body("password")
       .trim()
       .notEmpty()
-      .withMessage("Password is a required field")
+      .withMessage("Password is required")
       .isLength({ min: 8 })
-      .withMessage("Password needs to have minimum of 8 characters "),
+      .withMessage("Password must be atleast 3 characters long"),
   ];
 };
 
 const userLoginValidator = () => {
   return [
-    body("email").trim().optional().isEmail().withMessage("Email is invalid"),
-    body("password").notEmpty().withMessage("Password is a required field"),
+    body("identifier")
+      .trim()
+      .notEmpty()
+      .withMessage("Email or username is required"),
+    body("password").notEmpty().withMessage("Password is required"),
   ];
 };
 
@@ -44,9 +47,9 @@ const userForgotPasswordValidator = () => {
   return [
     body("email")
       .notEmpty()
-      .withMessage("Email is a required field ")
+      .withMessage("Email is required")
       .isEmail()
-      .withMessage("Email is invalid"),
+      .withMessage("Please enter a valid email address"),
   ];
 };
 
@@ -54,25 +57,29 @@ const userResetForgotPassword = () => {
   return [
     body("newPassword")
       .notEmpty()
-      .withMessage("New Password is a required field"),
+      .withMessage("New Password is a required field")
+      .isLength({ min: 8 })
+      .withMessage("New password must be at least 8 characters long"),
     body("confirmNewPassword")
       .notEmpty()
-      .withMessage("This is a required field"),
+      .withMessage("This is a required field")
+      .isLength({ min: 8 })
+      .withMessage("New password must be at least 8 characters long"),
   ];
 };
 
 // ------------------------------Skills validators--------------------------------------
 const addSkillValidator = () => {
-  return [body("skills").notEmpty().withMessage("This is a required field")];
+  return [body("skills").notEmpty().withMessage("Skill is required")];
 };
 const deleteSkillsValidator = () => {
   return [
     body("type")
       .notEmpty()
-      .withMessage("This a required field")
+      .withMessage("Type is required")
       .trim()
       .toLowerCase(),
-    body("skills").notEmpty().withMessage("This is a required field"),
+    body("skills").notEmpty().withMessage("Skill is required"),
   ];
 };
 
