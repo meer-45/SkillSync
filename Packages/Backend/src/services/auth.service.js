@@ -73,10 +73,10 @@ const authenticateUser = async (identifier, password) => {
     $or: [{ username: identifier }, { email: identifier }],
   });
 
-  if (!user) throw new ApiError(404, "User not found. Please sign up.");
+  if (!user) throw new ApiError(401, "Invalid credentials");
 
   const isPasswordValid = await user.isPasswordCorrect(password);
-  if (!isPasswordValid) throw new ApiError(400, "Invalid credentials");
+  if (!isPasswordValid) throw new ApiError(401, "Invalid credentials");
 
   return user;
 };
