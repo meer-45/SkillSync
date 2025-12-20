@@ -1,6 +1,9 @@
+// src/pages/Dashboard.jsx (The original file you provided)
+
 import React from 'react';
-import DashboardNavbar from '../DashboardComponents/DashboardNavbar';
-import Sidebar from '../DashboardComponents/Sidebar';
+import DashboardNavbar from '../DashboardComponents/DashboardNavbar'; // Assuming DashboardNavbar is defined
+import Sidebar from '../DashboardComponents/Sidebar'; // Assuming Sidebar is defined
+import DashboardContent from '../DashboardComponents/DashboardContent'; // NEW IMPORT
 
 const Dashboard = ({ children }) => {
   return (
@@ -12,25 +15,16 @@ const Dashboard = ({ children }) => {
       <Sidebar />
 
       {/* 3. Main Content Area */}
-      {/* We use pt-16 (for Navbar height) and pl-64 (for Sidebar width) 
-          to push the content into the correct visible area. */}
+      {/* We use pt-16 (for Navbar height) and pl-64 (for Sidebar width) */}
       <main className="pt-16 pl-64 p-8">
-        {/* Placeholder content for the main dashboard view */}
-        <div className="text-2xl font-bold text-gray-800 mb-6">
-          Welcome to the Dashboard!
-        </div>
-        <div className="h-[200vh] bg-white rounded-lg p-6 shadow-md">
-            {/* The main content area where data/charts would go. */}
-            <p className="text-gray-600">
-                This space represents the main content of your application. 
-                Scroll down to see the fixed navbar and sidebar remain in place.
-            </p>
-        </div>
+        
+        {/* Render the new dashboard content here */}
+        <DashboardContent /> 
+        
         {children}
       </main>
     </div>
   );
 };
 
-// To run this example, replace the content of your App.js with this component:
 export default Dashboard;
