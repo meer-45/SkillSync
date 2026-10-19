@@ -1,84 +1,130 @@
-# SkillSync Deployment Guide
+# SkillSync deployment guide
 
-## Stack
-- **Frontend** → Vercel (free)
-- **Backend**  → Render (free)
-- **Database** → MongoDB Atlas (free)
+This guide deploys the frontend to Vercel, the backend to Render, and the database to MongoDB Atlas.
 
----
+## 1. MongoDB Atlas
 
-## Step 1 — MongoDB Atlas
-1. Go to https://cloud.mongodb.com → Create free cluster
-2. Create a database user (username + password)
-3. Allow network access: `0.0.0.0/0`
-4. Copy your connection string:
-   `mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/skillsync`
+1. Create a MongoDB Atlas cluster.
+2. Create a database user.
+3. Add the deployment service IP address under **Network Access**.
+4. Copy the driver connection string, for example:
 
----
-
-## Step 2 — Deploy Backend to Render
-1. Push your code to GitHub
-2. Go to https://render.com → New Web Service
-3. Connect your GitHub repo → select `packages/backend` as root dir
-4. Set these env vars in Render dashboard:
+   ```text
+   mongodb+srv://<user>:<password>@<cluster>.mongodb.net/skillsync
    ```
+
+Do not commit this connection string or any password.
+
+## 2. Deploy the backend to Render
+
+1. Push the repository to GitHub.
+2. Create a new Render Web Service.
+3. Select the repository and set the root directory to `packages/backend`.
+4. Use these commands:
+
+   ```text
+   Build Command: npm install && npm run build
+   Start Command: npm start
+   ```
+
+5. Add these environment variables in Render:
+
+   ```env
    PORT=8000
-   MONGO_URI=<your atlas connection string>
-   ACCESS_TOKEN_SECRET=<random 32-char string>
-   REFRESH_TOKEN_SECRET=<random 32-char string>
+   MONGO_URI=<your-atlas-connection-string>
+   ACCESS_TOKEN_SECRET=<random-secret>
    ACCESS_TOKEN_EXPIRY_JWT=1d
+   REFRESH_TOKEN_SECRET=<random-secret>
    REFRESH_TOKEN_EXPIRY_JWT=7d
-   CORS_ORIGIN=https://your-app.vercel.app  ← update after step 3
+   CORS_ORIGIN=https://<your-frontend>.vercel.app
+   EMAIL_USER=<your-email>
+   EMAIL_PASS=<your-email-app-password>
    ```
-5. Deploy — note your backend URL e.g. `https://skillsync-backend.onrender.com`
 
----
+6. Deploy and copy the backend URL, for example:
 
-## Step 3 — Deploy Frontend to Vercel
-1. Go to https://vercel.com → New Project
-2. Import your GitHub repo → set root directory to `packages/frontend`
-3. Add env variable:
+   ```text
+   https://skillsync-backend.onrender.com
    ```
+
+### Optional Google OAuth
+
+Add these variables if Google login is enabled:
+
+```env
+GOOGLE_CLIENT_ID=<google-client-id>
+GOOGLE_CLIENT_SECRET=<google-client-secret>
+GOOGLE_CALLBACK_URL=https://skillsync-backend.onrender.com/api/v1/auth/google/callback
+```
+
+The callback URL must also be registered in Google Cloud Console.
+
+## 3. Deploy the frontend to Vercel
+
+1. Create a new Vercel project from the repository.
+2. Set the root directory to `packages/frontend`.
+3. Add this environment variable:
+
+   ```env
    VITE_BACKEND_URL=https://skillsync-backend.onrender.com/api/v1
    ```
-4. Deploy — note your frontend URL e.g. `https://skillsync.vercel.app`
 
----
+4. Deploy and copy the frontend URL.
 
-## Step 4 — Update CORS on Render
-1. Go back to Render → your backend service → Environment
-2. Update `CORS_ORIGIN` to your Vercel URL:
-   ```
-   CORS_ORIGIN=https://skillsync.vercel.app
-   ```
-3. Redeploy backend
+## 4. Update backend CORS
 
----
+Update the Render environment variable with the actual Vercel URL:
 
-## Step 5 — Seed Skills (optional)
-```bash
-cd packages/backend
-node src/scripts/seedSkills.js
+```env
+CORS_ORIGIN=https://<your-frontend>.vercel.app
 ```
 
----
+Redeploy the backend after changing it.
 
-## Making yourself Admin
-In MongoDB Atlas → Browse Collections → users collection:
-Find your user and change `role` from `"Learner"` to `"Admin"`
-Then log out and log back in.
+## 5. Seed skills
 
----
+Run this locally with a backend `.env` pointing to the target database:
 
-## Local Development
 ```bash
-# Terminal 1 — Backend
 cd packages/backend
-cp .env.example .env   # fill in your values
-npm run dev
+npm install
+npx tsx src/scripts/seedSkills.ts
+```
 
-# Terminal 2 — Frontend  
+Or build first and run the compiled JavaScript:
+
+```bash
+npm run build
+node dist/scripts/seedSkills.js
+```
+
+## 6. Make a user an admin
+
+In MongoDB Atlas, open the `users` collection and change the user's `role` to `"Admin"`. Log out and log back in afterward so the new role is reflected in the token.
+
+## Local development
+
+Backend terminal:
+
+```bash
+cd packages/backend
+cp .env.example .env
+# Fill in MONGO_URI and the required secrets
+npm install
+npm run dev
+```
+
+Frontend terminal:
+
+```bash
 cd packages/frontend
-cp .env.example .env   # already set for localhost
+cp .env.example .env
+npm install
 npm run dev
 ```
+
+Local URLs:
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:8000`
+- Health check: `http://localhost:8000/api/v1/healthcheck`

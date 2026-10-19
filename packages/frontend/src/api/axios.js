@@ -20,9 +20,9 @@ API.interceptors.request.use((config) => {
 export default API;
 
 // Auth
-export const loginUser = (data) => API.post("/api/v1/auth/login", data);
-export const registerUser = (data) => API.post("/api/v1/auth/register", data);
-export const logoutUser = () => API.post("/api/v1/auth/logout");
+export const loginUser = (data) => API.post("/auth/login", data);
+export const registerUser = (data) => API.post("/auth/register", data);
+export const logoutUser = () => API.post("/auth/logout");
 
 // Skills
 export const getAllSkills = () => API.get("/skills");
@@ -32,7 +32,7 @@ export const saveSkills = (data) => API.post("/user-skills", data);
 export const getUserSkills = () => API.get("/user-skills/me");
 
 // Progress
-export const getProgress = () => API.get("/api/v1/progress");
+export const getProgress = () => API.get("/progress");
 
 // Requests
-export const getRequests = () => API.get("/api/v1/requests");
+export const getRequests = () => API.get("/requests");
