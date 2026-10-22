@@ -4,6 +4,7 @@ import Request, {
 } from "../models/request.models.js";
 import ApiError from "../utils/ApiError.js";
 import { createNotification } from "./notification.service.js";
+import UserSkill from "../models/userSkill.models.js";
 
 type UserId = string | mongoose.Types.ObjectId;
 type RequestStatus = "pending" | "accepted" | "rejected";
@@ -27,6 +28,12 @@ export const addRequestService = async (
   if (fromUserId.toString() === toUserId.toString()) {
     throw new ApiError(400, "Cannot send request to yourself");
   }
+  const offeredSkill = await UserSkill.findOne({
+    userId: toUserId,
+    skillId,
+    type: "offer",
+  });
+  if (!offeredSkill) throw new ApiError(400, "The receiver does not offer this skill");
 
   const newRequest = new Request({
     fromUserId,
@@ -53,6 +60,9 @@ export const updateRequestService = async (
   userId: UserId,
   status: RequestStatus,
 ): Promise<RequestDocument> => {
+  if (!["accepted", "rejected"].includes(status)) {
+    throw new ApiError(400, "Status must be accepted or rejected");
+  }
   const request = await Request.findOne({ _id: requestId, toUserId: userId });
   if (!request) {
     throw new ApiError(
@@ -61,6 +71,9 @@ export const updateRequestService = async (
     );
   }
 
+  if (request.status !== "pending") {
+    throw new ApiError(400, "Only pending requests can be updated");
+  }
   request.status = status;
   await request.save();
 

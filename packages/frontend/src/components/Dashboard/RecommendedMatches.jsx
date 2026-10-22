@@ -15,7 +15,7 @@ const RecommendedMatches = () => {
 
   useEffect(() => {
     API.get("/matchmaking")
-      .then((r) => setMatches((r.data.matches || r.data.data || []).slice(0, 3)))
+      .then((r) => setMatches((r.data.data || []).slice(0, 3)))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

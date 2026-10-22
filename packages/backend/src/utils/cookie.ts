@@ -16,10 +16,9 @@ export const setAuthCookies = (
 
   const options: CookieOptions = {
     httpOnly: true,
-    secure: false,
-    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     path: "/",
-    domain: "localhost",
   };
 
   res.cookie("accessToken", accessToken, {
@@ -34,6 +33,12 @@ export const setAuthCookies = (
 };
 
 export const clearAuthCookies = (res: Response) => {
-  res.clearCookie("accessToken", { path: "/", domain: "localhost" });
-  res.clearCookie("refreshToken", { path: "/", domain: "localhost" });
+  const options: CookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    path: "/",
+  };
+  res.clearCookie("accessToken", options);
+  res.clearCookie("refreshToken", options);
 };

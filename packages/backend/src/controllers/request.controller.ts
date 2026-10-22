@@ -6,6 +6,7 @@ import {
 import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import mongoose from "mongoose";
 
 export const getAllRequestsController = asyncHandler(async (req, res) => {
   const userId = req.user!._id;
@@ -17,7 +18,13 @@ export const getAllRequestsController = asyncHandler(async (req, res) => {
 
 export const addRequestController = asyncHandler(async (req, res) => {
   const { toUserId, message, skillId } = req.body;
-  if (!skillId || !toUserId) {
+  if (
+    typeof toUserId !== "string" ||
+    !mongoose.isValidObjectId(toUserId) ||
+    typeof skillId !== "string" ||
+    !mongoose.isValidObjectId(skillId) ||
+    (message !== undefined && (typeof message !== "string" || !message.trim()))
+  ) {
     throw new ApiError(400, "toUserId and skillId are required");
   }
 
@@ -50,7 +57,11 @@ export const addRequestController = asyncHandler(async (req, res) => {
 export const updateRequestController = asyncHandler(async (req, res) => {
   const { requestId } = req.params;
   const { status } = req.body;
-  if (!requestId || !status) {
+  if (
+    !requestId ||
+    !mongoose.isValidObjectId(requestId) ||
+    !["accepted", "rejected"].includes(status)
+  ) {
     throw new ApiError(400, "Request ID and status are required");
   }
 

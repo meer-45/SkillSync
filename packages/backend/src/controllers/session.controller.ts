@@ -8,6 +8,7 @@ import {
   updateSessionService,
   deleteSessionService,
 } from "../services/session.services.js";
+import mongoose from "mongoose";
 
 export const getAllSessionsController = asyncHandler(async (req, res) => {
   const sessions = await getAllSessionsService(req.user!._id);
@@ -18,7 +19,12 @@ export const getAllSessionsController = asyncHandler(async (req, res) => {
 
 export const createSessionController = asyncHandler(async (req, res) => {
   const { teacherId, learnerId, skillId, startTime, endTime } = req.body;
-  if (!teacherId || !learnerId || !skillId || !startTime || !endTime) {
+  if (
+    typeof teacherId !== "string" || !mongoose.isValidObjectId(teacherId) ||
+    typeof learnerId !== "string" || !mongoose.isValidObjectId(learnerId) ||
+    typeof skillId !== "string" || !mongoose.isValidObjectId(skillId) ||
+    typeof startTime !== "string" || typeof endTime !== "string"
+  ) {
     throw new ApiError(
       400,
       "teacherId, learnerId, skillId, startTime and endTime are all required",
@@ -26,6 +32,7 @@ export const createSessionController = asyncHandler(async (req, res) => {
   }
 
   const session = await createSessionService({
+    requesterId: req.user!._id,
     teacherId,
     learnerId,
     skillId,
@@ -38,7 +45,7 @@ export const createSessionController = asyncHandler(async (req, res) => {
 });
 
 export const getSessionByIdController = asyncHandler(async (req, res) => {
-  if (!req.params.id) throw new ApiError(400, "Session ID is required");
+  if (!req.params.id || !mongoose.isValidObjectId(req.params.id)) throw new ApiError(400, "Invalid session ID");
   const session = await getSessionByIdService(String(req.params.id), req.user!._id);
   return res
     .status(200)
@@ -46,8 +53,8 @@ export const getSessionByIdController = asyncHandler(async (req, res) => {
 });
 
 export const updateSessionController = asyncHandler(async (req, res) => {
-  if (!req.params.id) throw new ApiError(400, "Session ID is required");
-  if (!req.body.status) throw new ApiError(400, "Status is required");
+  if (!req.params.id || !mongoose.isValidObjectId(req.params.id)) throw new ApiError(400, "Invalid session ID");
+  if (!["completed", "cancelled"].includes(req.body.status)) throw new ApiError(400, "Invalid session status");
 
   const session = await updateSessionService(
     String(req.params.id),

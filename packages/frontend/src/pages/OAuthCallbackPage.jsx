@@ -1,27 +1,19 @@
 import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import API from "../api/axios";
 
 const OAuthCallbackPage = () => {
-  const [params] = useSearchParams();
   const navigate = useNavigate();
   const { login } = useAuth();
 
   useEffect(() => {
-    const token = params.get("token");
-    const user = params.get("user");
-
-    if (token && user) {
-      try {
-        localStorage.setItem("accessToken", token);
-        login(JSON.parse(decodeURIComponent(user)));
+    API.get("/auth/current-user")
+      .then((response) => {
+        login(response.data.data);
         navigate("/dashboard", { replace: true });
-      } catch {
-        navigate("/login", { replace: true });
-      }
-    } else {
-      navigate("/login", { replace: true });
-    }
+      })
+      .catch(() => navigate("/login", { replace: true }));
   }, []);
 
   return (

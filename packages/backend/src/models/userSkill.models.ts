@@ -37,7 +37,7 @@ const userSkillSchema = new mongoose.Schema<UserSkillDocument, UserSkillModel>(
     },
     proficiency: {
       type: Number,
-      min: 0,
+      min: 1,
       max: 5,
       default: 1,
     },

@@ -20,11 +20,13 @@ type TokenResponse = {
   refreshToken: string;
 };
 
+const hashToken = (token: string): string =>
+  crypto.createHash("sha256").update(token).digest("hex");
 
 export const generateAccessAndRefreshTokens = async (
   userId: string,
 ): Promise<TokenResponse> => {
-  const user = await User.findById(userId);
+  const user = await User.findById(userId).select("+refreshTokenHash");
 
   if (!user) {
     throw new ApiError(404, "User not found");
@@ -60,8 +62,17 @@ export const registerUser = async (
     throw new ApiError(400, "Password is required");
   }
 
+  const allowedRoles: Array<Exclude<UserFields["role"], "Admin">> = [
+    "Learner",
+    "Mentor",
+    "Hybrid",
+  ];
+  const role = allowedRoles.includes(userDetails.role as Exclude<UserFields["role"], "Admin">)
+    ? userDetails.role
+    : "Learner";
   const user = await User.create({
     ...userDetails,
+    role,
     passwordHash: password,
   });
   return user;
@@ -81,7 +92,7 @@ export const loginUser = async (
       { email: identifier.toLowerCase() },
       { username: identifier.toLowerCase() },
     ],
-  });
+  }).select("+passwordHash");
 
   if (!user) return null;
 
@@ -114,21 +125,21 @@ export const logoutUser = async (userId: string): Promise<boolean> => {
  * Forgot Password — generate token and send email
  */
 export const forgotPasswordService = async (email: string): Promise<boolean> => {
-  console.log("forgotPasswordService called with:", email);
   const user = await User.findOne({ email: email.toLowerCase() });
-  console.log("user found:", user?._id);
-  if (!user) throw new ApiError(404, "No account found with this email");
+  // Do not disclose whether an email address is registered.
+  if (!user) return true;
 
   const token = crypto.randomBytes(32).toString("hex");
   const expiry = new Date(Date.now() + 60 * 60 * 1000);
 
-  user.passwordResetToken = token;
+  user.passwordResetToken = hashToken(token);
   user.passwordResetExpiry = expiry;
   await user.save({ validateBeforeSave: false });
-  console.log("token saved, sending email...");
-
-  await sendPasswordResetEmail(user.email, token);
-  console.log("email sent!");
+  try {
+    await sendPasswordResetEmail(user.email, token);
+  } catch (error) {
+    console.error("Password reset email delivery failed:", error);
+  }
   return true;
 };
 /**
@@ -139,9 +150,9 @@ export const resetPasswordService = async (
   newPassword: string,
 ): Promise<boolean> => {
   const user = await User.findOne({
-    passwordResetToken: token,
+    passwordResetToken: hashToken(token),
     passwordResetExpiry: { $gt: new Date() },
-  });
+  }).select("+passwordResetToken +passwordResetExpiry");
   if (!user) throw new ApiError(400, "Reset link is invalid or has expired");
 
   user.passwordHash = newPassword;
@@ -164,7 +175,7 @@ export const sendVerificationEmailService = async (
   const token = crypto.randomBytes(32).toString("hex");
   const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-  user.emailVerifyToken = token;
+  user.emailVerifyToken = hashToken(token);
   user.emailVerifyExpiry = expiry;
   await user.save({ validateBeforeSave: false });
 
@@ -177,9 +188,9 @@ export const sendVerificationEmailService = async (
  */
 export const verifyEmailService = async (token: string): Promise<boolean> => {
   const user = await User.findOne({
-    emailVerifyToken: token,
+    emailVerifyToken: hashToken(token),
     emailVerifyExpiry: { $gt: new Date() },
-  });
+  }).select("+emailVerifyToken +emailVerifyExpiry");
   if (!user)
     throw new ApiError(400, "Verification link is invalid or has expired");
 

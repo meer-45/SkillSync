@@ -36,7 +36,7 @@ const SettingsPage = () => {
   const handleDelete = async () => {
     if (!window.confirm("Delete your account permanently? This cannot be undone.")) return;
     try {
-      await API.delete(`/users/${user._id}`);
+      await API.delete("/users/me");
       localStorage.removeItem("accessToken");
       window.location.href = "/";
     } catch { toast.error("Failed to delete account"); }

@@ -11,8 +11,9 @@ export const getChatHistory = asyncHandler(async (req, res) => {
   const roomId = getRoomId(req.user!._id, String(req.params.userId));
   const messages = await Message.find({ roomId })
     .populate("sender", "fullName username avatar")
-    .sort({ createdAt: 1 })
+    .sort({ createdAt: -1 })
     .limit(100);
+  messages.reverse();
 
   await Message.updateMany(
     { roomId, sender: { $ne: req.user!._id }, isRead: false },

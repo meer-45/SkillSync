@@ -7,10 +7,15 @@ import {
   updateUserProficiencyService,
 } from "../services/userSkill.services.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import mongoose from "mongoose";
 
 export const addUserSkillController = asyncHandler(async (req, res) => {
   const { skill, type } = req.body;
-  if (!skill || !type) {
+  if (
+    typeof skill !== "string" ||
+    !skill.trim() ||
+    !["offer", "want"].includes(type)
+  ) {
     throw new ApiError(400, "Skill and type are required");
   }
 
@@ -33,7 +38,9 @@ export const getCurrentUserSkillsController = asyncHandler(async (req, res) => {
 
 export const updateUserSkillController = asyncHandler(async (req, res) => {
   const { proficiency } = req.body;
-  if (!proficiency) throw new ApiError(400, "Proficiency is required");
+  if (typeof proficiency !== "number" || !Number.isInteger(proficiency)) {
+    throw new ApiError(400, "Proficiency must be an integer");
+  }
   if (proficiency < 1 || proficiency > 5) {
     throw new ApiError(400, "Proficiency must be between 1 and 5");
   }
@@ -43,6 +50,7 @@ export const updateUserSkillController = asyncHandler(async (req, res) => {
     proficiency,
     req.user!._id,
   );
+  if (!mongoose.isValidObjectId(req.params.id)) throw new ApiError(400, "Invalid user skill ID");
   if (!userSkill) throw new ApiError(404, "User skill not found");
 
   return res
@@ -51,6 +59,7 @@ export const updateUserSkillController = asyncHandler(async (req, res) => {
 });
 
 export const deleteUserSkillController = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw new ApiError(400, "Invalid user skill ID");
   const userSkill = await deleteUserSkillService(
     String(req.params.id),
     req.user!._id,

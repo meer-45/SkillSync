@@ -5,6 +5,7 @@ import { User } from "../models/user.models.js";
 import Feedback from "../models/feedback.models.js";
 import Request from "../models/request.models.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import mongoose from "mongoose";
 
 const BADGE_DEFS = [
   { id: "first_session", threshold: 1, category: "sessions" },
@@ -21,6 +22,7 @@ const BADGE_DEFS = [
 ] as const;
 
 export async function syncBadges(userId: string) {
+  const userObjectId = new mongoose.Types.ObjectId(userId);
   const [
     totalSessions,
     teachSessions,
@@ -51,6 +53,7 @@ export async function syncBadges(userId: string) {
   const launchDate = new Date("2024-11-01");
   const earlyAdopter =
     user?.createdAt &&
+    new Date(user.createdAt).getTime() - launchDate.getTime() >= 0 &&
     new Date(user.createdAt).getTime() - launchDate.getTime() < 30 * 86400000
       ? 1
       : 0;
@@ -69,22 +72,37 @@ export async function syncBadges(userId: string) {
     request_sent_5: requestsSent,
   };
 
-  for (const definition of BADGE_DEFS) {
-    const progress = progressMap[definition.id] ?? 0;
-    const earned = progress >= definition.threshold;
-    await UserBadge.findOneAndUpdate(
-      { user: userId, badgeId: definition.id },
-      {
-        $set: {
-          progress,
-          earned,
-          ...(earned ? { earnedAt: new Date() } : {}),
+  await UserBadge.bulkWrite(
+    BADGE_DEFS.map((definition) => {
+      const progress = progressMap[definition.id] ?? 0;
+      const earned = progress >= definition.threshold;
+      return {
+        updateOne: {
+          filter: { user: userObjectId, badgeId: definition.id },
+          update: [
+            {
+              $set: {
+                user: userObjectId,
+                badgeId: definition.id,
+                progress,
+                earned,
+                earnedAt: earned
+                  ? {
+                      $cond: [
+                        { $eq: [{ $ifNull: ["$earned", false] }, false] },
+                        new Date(),
+                        "$earnedAt",
+                      ],
+                    }
+                  : "$earnedAt",
+              },
+            },
+          ],
+          upsert: true,
         },
-        $setOnInsert: { user: userId, badgeId: definition.id },
-      },
-      { upsert: true },
-    );
-  }
+      };
+    }),
+  );
 }
 
 export const getMyBadgesController = asyncHandler(async (req, res) => {

@@ -44,7 +44,7 @@ const MatchmakingPage = () => {
           API.get("/skills"),
         ]);
         if (m.status === "fulfilled")
-          setMatches(m.value.data.matches || m.value.data.data || []);
+          setMatches(m.value.data.data || []);
         else toast.error("Could not load matches");
         if (s.status === "fulfilled") setSkills(s.value.data.data || []);
       } catch {

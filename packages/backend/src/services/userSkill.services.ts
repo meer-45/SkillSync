@@ -22,7 +22,7 @@ export const addUserSkillService = async (
     skillId: skillDoc._id,
     name: skill,
     type,
-    proficiency: 0,
+    proficiency: 1,
   });
 
   if (!userSkill) {

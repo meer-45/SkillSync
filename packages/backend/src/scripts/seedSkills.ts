@@ -97,9 +97,15 @@ const seedSkills = async (): Promise<void> => {
   try {
     await mongoose.connect(mongoUri);
     console.log("MongoDB connected");
-    await Skill.deleteMany({});
-    console.log("Cleared existing skills");
-    await Skill.insertMany(skills);
+    await Skill.bulkWrite(
+      skills.map((skill) => ({
+        updateOne: {
+          filter: { name: skill.name },
+          update: { $set: skill },
+          upsert: true,
+        },
+      })),
+    );
     console.log(`Added ${skills.length} skills successfully`);
   } finally {
     await mongoose.disconnect();

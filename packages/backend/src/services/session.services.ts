@@ -9,10 +9,14 @@ import { createNotification } from "./notification.service.js";
 import Wallet from "../models/wallet.models.js";
 import Transaction from "../models/transaction.models.js";
 import Progress from "../models/progress.models.js";
+import { User } from "../models/user.models.js";
+import Skill from "../models/skill.models.js";
+import Request from "../models/request.models.js";
 
 type UserId = string | mongoose.Types.ObjectId;
 
 type CreateSessionInput = {
+  requesterId: UserId;
   teacherId: UserId;
   learnerId: UserId;
   skillId: UserId;
@@ -31,6 +35,7 @@ export const getAllSessionsService = async (userId: UserId) => {
 };
 
 export const createSessionService = async ({
+  requesterId,
   teacherId,
   learnerId,
   skillId,
@@ -40,32 +45,69 @@ export const createSessionService = async ({
   if (teacherId.toString() === learnerId.toString()) {
     throw new ApiError(400, "Teacher and learner cannot be the same user");
   }
+  if (
+    requesterId.toString() !== teacherId.toString() &&
+    requesterId.toString() !== learnerId.toString()
+  ) {
+    throw new ApiError(403, "You must be a session participant");
+  }
+  const [teacher, learner, skill] = await Promise.all([
+    User.exists({ _id: teacherId }),
+    User.exists({ _id: learnerId }),
+    Skill.exists({ _id: skillId }),
+  ]);
+  if (!teacher || !learner || !skill) {
+    throw new ApiError(400, "Invalid session participant or skill");
+  }
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const duration = end.getTime() - start.getTime();
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    throw new ApiError(400, "Invalid session time");
+  }
+  if (start.getTime() <= Date.now()) throw new ApiError(400, "Session must start in the future");
+  if (duration < 15 * 60 * 1000 || duration > 4 * 60 * 60 * 1000) {
+    throw new ApiError(400, "Session duration must be between 15 minutes and 4 hours");
+  }
+  const acceptedRequest = await Request.exists({
+    $or: [
+      { fromUserId: teacherId, toUserId: learnerId },
+      { fromUserId: learnerId, toUserId: teacherId },
+    ],
+    skillId,
+    status: "accepted",
+  });
+  if (!acceptedRequest) throw new ApiError(400, "An accepted request is required before scheduling");
 
   const session = await Session.create({
     teacherId,
     learnerId,
     skillId,
-    startTime: new Date(startTime),
-    endTime: new Date(endTime),
+    startTime: start,
+    endTime: end,
     status: "scheduled",
   });
 
-  await Promise.allSettled([
-    createNotification({
-      userId: learnerId,
-      type: "session_created",
-      message: "A new learning session has been scheduled for you 📅",
-      link: "/sessions",
-      fromUser: teacherId,
-    }),
-    createNotification({
-      userId: teacherId,
-      type: "session_created",
-      message: "A new teaching session has been scheduled 📅",
-      link: "/sessions",
-      fromUser: learnerId,
-    }),
-  ]);
+  try {
+    await Promise.all([
+      createNotification({
+        userId: learnerId,
+        type: "session_created",
+        message: "A new learning session has been scheduled for you 📅",
+        link: "/sessions",
+        fromUser: teacherId,
+      }),
+      createNotification({
+        userId: teacherId,
+        type: "session_created",
+        message: "A new teaching session has been scheduled 📅",
+        link: "/sessions",
+        fromUser: learnerId,
+      }),
+    ]);
+  } catch (error) {
+    console.error("Session creation notifications failed:", error);
+  }
 
   return session;
 };
@@ -74,26 +116,22 @@ export const getSessionByIdService = async (
   sessionId: UserId,
   userId: UserId,
 ) => {
-  const session = await Session.findById(sessionId)
+  const session = await Session.findOne({
+    _id: sessionId,
+    $or: [{ teacherId: userId }, { learnerId: userId }],
+  })
     .populate("teacherId", "fullName username email")
     .populate("learnerId", "fullName username email")
     .populate("skillId", "name category");
 
   if (!session) throw new ApiError(404, "Session not found");
 
-  const isParticipant =
-    session.teacherId.toString() === userId.toString() ||
-    session.learnerId.toString() === userId.toString();
-
-  if (!isParticipant) {
-    throw new ApiError(403, "You are not authorized to view this session");
-  }
-
   return session;
 };
 
 const handleSessionCompletion = async (
   session: SessionDocument,
+  dbSession: mongoose.ClientSession,
 ): Promise<void> => {
   const start = new Date(session.startTime);
   const end = new Date(session.endTime);
@@ -107,54 +145,42 @@ const handleSessionCompletion = async (
   const teacherId = session.teacherId.toString();
   const learnerId = session.learnerId.toString();
 
-  let teacherWallet = await Wallet.findOne({ userId: teacherId });
-  if (!teacherWallet) {
-    teacherWallet = await Wallet.create({ userId: teacherId, balance: 0 });
-  }
-  teacherWallet.balance += tokens;
-  await teacherWallet.save();
-
-  await Transaction.create({
+  await Wallet.findOneAndUpdate(
+    { userId: teacherId },
+    { $inc: { balance: tokens }, $setOnInsert: { userId: teacherId } },
+    { upsert: true, new: true, session: dbSession },
+  );
+  await Transaction.create([{
     fromUser: null,
     toUser: teacherId,
     amount: tokens,
     transactionType: "earn",
-  });
+  }], { session: dbSession });
 
   const updateProgress = async (
     userId: string,
     role: "teacher" | "learner",
   ): Promise<void> => {
-    let progress = await Progress.findOne({ userId });
+    let progress = await Progress.findOne({ userId }).session(dbSession);
     if (!progress) {
-      progress = await Progress.create({
+      [progress] = await Progress.create([{
         userId,
         xp: 0,
         level: 1,
         weeklyHours: 0,
         weeklySessions: 0,
         weekStart: new Date(),
-      });
+      }], { session: dbSession });
     }
     progress.xp += role === "teacher" ? xpEarned : Math.round(xpEarned * 0.5);
     progress.level = Math.floor(progress.xp / 100) + 1;
     progress.weeklyHours += hours;
     progress.weeklySessions += 1;
-    await progress.save();
+    await progress.save({ session: dbSession });
   };
 
-  await Promise.allSettled([
-    updateProgress(teacherId, "teacher"),
-    updateProgress(learnerId, "learner"),
-  ]);
-
-  await createNotification({
-    userId: teacherId,
-    type: "tokens_earned",
-    message: `You earned ${tokens} tokens for completing a session! 🎉`,
-    link: "/wallet",
-    fromUser: learnerId,
-  });
+  await updateProgress(teacherId, "teacher");
+  await updateProgress(learnerId, "learner");
 };
 
 export const updateSessionService = async (
@@ -162,9 +188,6 @@ export const updateSessionService = async (
   userId: UserId,
   status: SessionStatus,
 ): Promise<SessionDocument> => {
-  const session = await Session.findById(sessionId);
-  if (!session) throw new ApiError(404, "Session not found");
-
   if (!["scheduled", "completed", "cancelled"].includes(status)) {
     throw new ApiError(
       400,
@@ -172,40 +195,57 @@ export const updateSessionService = async (
     );
   }
 
+  const existing = await Session.findById(sessionId);
+  if (!existing) throw new ApiError(404, "Session not found");
   const isParticipant =
-    session.teacherId.toString() === userId.toString() ||
-    session.learnerId.toString() === userId.toString();
+    existing.teacherId.toString() === userId.toString() ||
+    existing.learnerId.toString() === userId.toString();
   if (!isParticipant) {
     throw new ApiError(403, "You are not authorized to update this session");
   }
 
-  if (session.status === "completed" && status === "completed") {
-    throw new ApiError(400, "Session is already completed");
+  if (existing.status !== "scheduled" || status === "scheduled") {
+    throw new ApiError(400, "Only scheduled sessions can be completed or cancelled");
   }
-
-  session.status = status;
-  await session.save();
+  if (status === "completed" && existing.learnerId.toString() !== userId.toString()) {
+    throw new ApiError(403, "Only the learner can complete a session");
+  }
+  const session = await Session.findOneAndUpdate(
+    { _id: sessionId, status: "scheduled" },
+    { $set: { status } },
+    { new: true },
+  );
+  if (!session) throw new ApiError(409, "Session was already updated");
 
   if (status === "completed") {
-    await Promise.allSettled([
-      handleSessionCompletion(session),
-      syncBadges(session.teacherId.toString()),
-      syncBadges(session.learnerId.toString()),
-      createNotification({
-        userId: session.teacherId,
-        type: "session_completed",
-        message: "Session completed! Don't forget to rate your experience ⭐",
-        link: "/sessions",
-        fromUser: session.learnerId,
-      }),
-      createNotification({
-        userId: session.learnerId,
-        type: "session_completed",
-        message: "Session completed! Don't forget to rate your experience ⭐",
-        link: "/sessions",
-        fromUser: session.teacherId,
-      }),
-    ]);
+    const dbSession = await mongoose.startSession();
+    try {
+      await dbSession.withTransaction(() => handleSessionCompletion(session, dbSession));
+    } finally {
+      await dbSession.endSession();
+    }
+    try {
+      await Promise.all([
+        syncBadges(session.teacherId.toString()),
+        syncBadges(session.learnerId.toString()),
+        createNotification({
+          userId: session.teacherId,
+          type: "session_completed",
+          message: "Session completed! Don't forget to rate your experience ⭐",
+          link: "/sessions",
+          fromUser: session.learnerId,
+        }),
+        createNotification({
+          userId: session.learnerId,
+          type: "session_completed",
+          message: "Session completed! Don't forget to rate your experience ⭐",
+          link: "/sessions",
+          fromUser: session.teacherId,
+        }),
+      ]);
+    } catch (error) {
+      console.error("Session completion side effects failed:", error);
+    }
   }
 
   if (status === "cancelled") {

@@ -52,9 +52,12 @@ Configure `packages/backend/.env`:
 PORT=8000
 MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/skillsync
 ACCESS_TOKEN_SECRET=your-access-token-secret
+ACCESS_TOKEN_EXPIRY=1d
 ACCESS_TOKEN_EXPIRY_JWT=1d
 REFRESH_TOKEN_SECRET=your-refresh-token-secret
+REFRESH_TOKEN_EXPIRY=7d
 REFRESH_TOKEN_EXPIRY_JWT=7d
+FRONTEND_URL=http://localhost:5173
 CORS_ORIGIN=http://localhost:5173
 EMAIL_USER=your-gmail@gmail.com
 EMAIL_PASS=your-gmail-app-password
@@ -188,4 +191,3 @@ See [DEPLOY.md](./DEPLOY.md) for production deployment instructions.
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
-

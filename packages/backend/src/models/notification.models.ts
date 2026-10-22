@@ -40,6 +40,7 @@ const notificationSchema = new Schema<NotificationFields>(
         "session_completed",
         "session_cancelled",
         "feedback_received",
+        "tokens_earned",
       ],
       required: true,
     },

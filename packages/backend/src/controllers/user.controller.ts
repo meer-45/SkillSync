@@ -2,6 +2,15 @@ import { User } from "../models/user.models.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import mongoose from "mongoose";
+import UserSkill from "../models/userSkill.models.js";
+import Wallet from "../models/wallet.models.js";
+import Progress from "../models/progress.models.js";
+import { UserBadge } from "../models/userBadge.models.js";
+import Notification from "../models/notification.models.js";
+import Request from "../models/request.models.js";
+import Feedback from "../models/feedback.models.js";
+import Session from "../models/session.models.js";
 
 export const getAllUsersController = asyncHandler(async (_req, res) => {
   const users = await User.find({}).select("-passwordHash -refreshTokenHash");
@@ -37,4 +46,42 @@ export const deleteUserController = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "User deleted successfully"));
+});
+
+export const searchUsersController = asyncHandler(async (req, res) => {
+  const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const users = await User.find({
+    $or: [
+      { fullName: { $regex: query, $options: "i" } },
+      { username: { $regex: query, $options: "i" } },
+    ],
+  }).select("_id fullName username avatar").limit(20);
+  return res.status(200).json(new ApiResponse(200, users, "Users found"));
+});
+
+export const deleteCurrentUserController = asyncHandler(async (req, res) => {
+  const userId = req.user!._id;
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      await Promise.all([
+        UserSkill.deleteMany({ userId }).session(session),
+        Wallet.deleteOne({ userId }).session(session),
+        Progress.deleteOne({ userId }).session(session),
+        UserBadge.deleteMany({ user: userId }).session(session),
+        Notification.deleteMany({ userId }).session(session),
+        Request.deleteMany({ $or: [{ fromUserId: userId }, { toUserId: userId }] }).session(session),
+        Feedback.deleteMany({ $or: [{ fromUser: userId }, { toUser: userId }] }).session(session),
+        Session.updateMany(
+          { $or: [{ teacherId: userId }, { learnerId: userId }], status: "scheduled" },
+          { $set: { status: "cancelled" } },
+          { session },
+        ),
+        User.deleteOne({ _id: userId }).session(session),
+      ]);
+    });
+  } finally {
+    await session.endSession();
+  }
+  return res.status(200).json(new ApiResponse(200, {}, "User deleted successfully"));
 });

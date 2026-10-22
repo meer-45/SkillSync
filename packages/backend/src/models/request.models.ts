@@ -49,8 +49,8 @@ const requestSchema = new mongoose.Schema<RequestDocument, RequestModel>(
 
 // Prevent duplicate active requests
 requestSchema.index(
-  { fromUserId: 1, toUserId: 1, skillId: 1, status: 1 },
-  { unique: true },
+  { fromUserId: 1, toUserId: 1, skillId: 1 },
+  { unique: true, partialFilterExpression: { status: "pending" } },
 );
 
 const Request = mongoose.model<RequestDocument, RequestModel>(

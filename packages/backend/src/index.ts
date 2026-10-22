@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+import "dotenv/config";
 import { createServer } from "http";
 import jwt from "jsonwebtoken";
 import cron from "node-cron";
@@ -9,16 +9,25 @@ import Progress from "./models/progress.models.js";
 import Message from "./models/chat.models.js";
 import { User, UserDocument } from "./models/user.models.js";
 
-dotenv.config({ path: "./.env" });
-
 type AuthenticatedSocket = Socket & { user: UserDocument };
 type MessagePayload = { toUserId?: string; message?: string };
 type TypingPayload = { toUserId?: string; isTyping?: boolean };
 
-const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET;
-if (!accessTokenSecret) {
-  throw new Error("ACCESS_TOKEN_SECRET is not configured");
+const requiredEnv = [
+  "MONGO_URI",
+  "ACCESS_TOKEN_SECRET",
+  "REFRESH_TOKEN_SECRET",
+  "ACCESS_TOKEN_EXPIRY_JWT",
+  "REFRESH_TOKEN_EXPIRY_JWT",
+  "ACCESS_TOKEN_EXPIRY",
+  "REFRESH_TOKEN_EXPIRY",
+  "FRONTEND_URL",
+] as const;
+const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+if (missingEnv.length) {
+  throw new Error(`Missing required environment variables: ${missingEnv.join(", ")}`);
 }
+const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET!;
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -88,6 +97,7 @@ io.on("connection", (socket) => {
         "fullName username avatar",
       );
       io.to(room).emit("receive_message", populated);
+      io.to(toUserId).emit("receive_message", populated);
     } catch {
       socket.emit("error", { message: "Failed to send message" });
     }

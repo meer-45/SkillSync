@@ -1,18 +1,24 @@
 import { User } from "../models/user.models.js";
-import {Request, Response} from "express";
+import asyncHandler from "../utils/asyncHandler.js";
+import ApiResponse from "../utils/ApiResponse.js";
 
-export const getMatchesController = async (req: Request, res: Response) => {
-  try {
-    if(!req.user || !req.user._id) {
-      return res.status(401).json({ message: "Unauthorized: User not authenticated" });
-    }
+export const getMatchesController = asyncHandler(async (req, res) => {
+    if (!req.user?._id) return res.status(401).json({ message: "Unauthorized" });
     const me = await User.findById(req.user._id);
     if (!me) return res.status(404).json({ message: "User not found" });
 
-    const myTeach = (me.skillsToTeach || []).map(s => s.toLowerCase().trim());
-    const myLearn = (me.skillsToLearn || []).map(s => s.toLowerCase().trim());
+    const myTeachValues = me.skillsToTeach || [];
+    const myLearnValues = me.skillsToLearn || [];
+    const myTeach = myTeachValues.map(s => s.toLowerCase().trim());
+    const myLearn = myLearnValues.map(s => s.toLowerCase().trim());
 
-    const others = await User.find({ _id: { $ne: req.user._id } })
+    const others = await User.find({
+      _id: { $ne: req.user._id },
+      $or: [
+        { skillsToTeach: { $in: myLearnValues } },
+        { skillsToLearn: { $in: myTeachValues } },
+      ],
+    })
       .select("fullName avatar bio skillsToTeach skillsToLearn")
       .lean();
 
@@ -45,12 +51,5 @@ export const getMatchesController = async (req: Request, res: Response) => {
       .sort((a, b) => b.matchScore - a.matchScore)
       .slice(0, 50);
 
-    res.json({ matches });
-  } catch (e) {
-    if(e instanceof Error) {
-      console.error("Error in getMatchesController:", e.message);
-    } else {
-      console.error("Unknown error in getMatchesController");
-    }
-  }
-};
+    return res.status(200).json(new ApiResponse(200, matches, "Matches retrieved successfully"));
+});

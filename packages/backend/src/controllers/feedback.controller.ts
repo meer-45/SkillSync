@@ -7,10 +7,20 @@ import {
   deleteFeedbackService,
 } from "../services/feedback.services.js";
 import type { Request, Response } from "express";
+import mongoose from "mongoose";
 
 export const createFeedbackController = asyncHandler(async (req: Request, res: Response) => {
   const { toUser, rating, comment } = req.body;
-  if (!toUser || !rating || !comment) {
+  if (
+    typeof toUser !== "string" ||
+    !mongoose.isValidObjectId(toUser) ||
+    typeof rating !== "number" ||
+    !Number.isInteger(rating) ||
+    rating < 1 ||
+    rating > 5 ||
+    typeof comment !== "string" ||
+    !comment.trim()
+  ) {
     throw new ApiError(400, "toUser, rating, and comment are required");
   }
   if(!req.user || !req.user._id) {
@@ -22,6 +32,7 @@ export const createFeedbackController = asyncHandler(async (req: Request, res: R
 
 export const getFeedbackForUserController = asyncHandler(async (req: Request, res: Response) => {
   const { userId } = req.params;
+  if (!mongoose.isValidObjectId(userId)) throw new ApiError(400, "Invalid user ID");
   const result = await getFeedbackForUserService(userId.toString());
   return res.status(200).json(new ApiResponse(200, result, "Feedback fetched successfully"));
 });

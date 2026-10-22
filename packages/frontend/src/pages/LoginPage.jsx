@@ -145,7 +145,8 @@ const LoginPage = () => {
           password: formData.password,
           role: formData.role,
         });
-        const token = res.data?.data?.accessToken || "1";
+        const token = res.data?.data?.accessToken;
+        if (!token) throw new Error("Authentication token missing");
         localStorage.setItem("accessToken", token);
         login(res.data?.data?.user);
         toast.success("Account created!");
@@ -155,8 +156,8 @@ const LoginPage = () => {
           identifier: formData.identifier.trim(),
           password: formData.password,
         });
-        const token =
-          res.data?.data?.accessToken || res.data?.accessToken || "1";
+        const token = res.data?.data?.accessToken;
+        if (!token) throw new Error("Authentication token missing");
         localStorage.setItem("accessToken", token);
         login(res.data?.data?.user);
         toast.success("Login successful!");

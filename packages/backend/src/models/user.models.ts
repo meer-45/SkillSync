@@ -53,6 +53,8 @@ const userSchema = new Schema<UserFields, UserModel, UserMethods>(
       required: true,
       unique: true,
       index: true,
+      lowercase: true,
+      trim: true,
     },
 
     email: {
@@ -60,6 +62,8 @@ const userSchema = new Schema<UserFields, UserModel, UserMethods>(
       required: true,
       unique: true,
       index: true,
+      lowercase: true,
+      trim: true,
     },
 
     age: {
@@ -70,6 +74,7 @@ const userSchema = new Schema<UserFields, UserModel, UserMethods>(
     passwordHash: {
       type: String,
       required: true,
+      select: false,
     },
 
     role: {
@@ -96,6 +101,7 @@ const userSchema = new Schema<UserFields, UserModel, UserMethods>(
     refreshTokenHash: {
       type: String,
       default: null,
+      select: false,
     },
 
     skillsToTeach: [
@@ -115,21 +121,25 @@ const userSchema = new Schema<UserFields, UserModel, UserMethods>(
     passwordResetToken: {
       type: String,
       default: null,
+      select: false,
     },
 
     passwordResetExpiry: {
       type: Date,
       default: null,
+      select: false,
     },
 
     emailVerifyToken: {
       type: String,
       default: null,
+      select: false,
     },
 
     emailVerifyExpiry: {
       type: Date,
       default: null,
+      select: false,
     },
 
     isEmailVerified: {
@@ -149,6 +159,9 @@ userSchema.pre("save", async function () {
 
   this.passwordHash = await bcrypt.hash(this.passwordHash, 10);
 });
+
+userSchema.index({ skillsToTeach: 1 });
+userSchema.index({ skillsToLearn: 1 });
 
 userSchema.methods.isPasswordCorrect = function (
   this: UserDocument,

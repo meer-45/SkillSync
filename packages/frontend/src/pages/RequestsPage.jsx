@@ -27,7 +27,7 @@ const RequestsPage = () => {
     const load = async () => {
       const [u, r, us, sk] = await Promise.allSettled([
         API.get("/auth/current-user"), API.get("/requests"),
-        API.get("/users"), API.get("/skills"),
+        API.get("/users/search?q="), API.get("/skills"),
       ]);
       if (u.status==="fulfilled") setUser(u.value.data.data);
       if (r.status==="fulfilled") setRequests(r.value.data.data || []);

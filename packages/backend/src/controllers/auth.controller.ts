@@ -30,6 +30,9 @@ export const registerUserController = asyncHandler(
       )
     )
       throw new ApiError(400, "All required fields must be filled");
+    if (age !== undefined && age !== null && (typeof age !== "number" || !Number.isInteger(age) || age < 0)) {
+      throw new ApiError(400, "Age must be a non-negative integer");
+    }
 
     const user = await registerUser({
       fullName,
@@ -37,15 +40,13 @@ export const registerUserController = asyncHandler(
       email,
       password,
       age,
-      role,
+      role: role === "Mentor" || role === "Hybrid" ? role : "Learner",
     });
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
       user._id.toString(),
     );
     setAuthCookies(res, accessToken, refreshToken);
-    const safeUser = await User.findById(user._id).select(
-      "-passwordHash -refreshTokenHash",
-    );
+    const safeUser = await User.findById(user._id);
 
     return res
       .status(201)
@@ -76,9 +77,7 @@ export const loginUserController = asyncHandler(
       user._id.toString(),
     );
     setAuthCookies(res, accessToken, refreshToken);
-    const safeUser = await User.findById(user._id).select(
-      "-passwordHash -refreshTokenHash",
-    );
+    const safeUser = await User.findById(user._id);
 
     return res
       .status(200)
@@ -106,10 +105,14 @@ export const refreshTokenController = asyncHandler(
       req.cookies?.refreshToken || req.body?.refreshToken;
     if (!incomingRefreshToken)
       throw new ApiError(401, "Unauthorized: No refresh token");
-    const decodedToken = jwt.verify(
-      incomingRefreshToken,
-      process.env.REFRESH_TOKEN_SECRET as string,
-    );
+    let decodedToken: string | jwt.JwtPayload;
+    try {
+      const secret = process.env.REFRESH_TOKEN_SECRET;
+      if (!secret) throw new Error("Refresh token secret is not configured");
+      decodedToken = jwt.verify(incomingRefreshToken, secret);
+    } catch {
+      throw new ApiError(401, "Invalid refresh token");
+    }
 
     if (
       typeof decodedToken === "string" ||
@@ -118,7 +121,9 @@ export const refreshTokenController = asyncHandler(
       throw new ApiError(401, "Invalid refresh token");
     }
 
-    const user = await User.findById(decodedToken.id);
+    const user = await User.findById(decodedToken.id).select(
+      "+refreshTokenHash",
+    );
     if (!user) throw new ApiError(401, "Invalid refresh token");
 
     if (!user.refreshTokenHash) {
@@ -149,7 +154,7 @@ export const changePasswordController = asyncHandler(
   async (req: Request, res: Response) => {
     const { oldPassword, newPassword } = req.body;
     if (!req.user) throw new ApiError(401, "Unauthorized");
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select("+passwordHash");
     if (!user) throw new ApiError(404, "User not found");
     const isPasswordValid = await user.isPasswordCorrect(oldPassword);
     if (!isPasswordValid) throw new ApiError(400, "Wrong old password");
@@ -178,7 +183,7 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
   await forgotPasswordService(email.trim());
   return res
     .status(200)
-    .json(new ApiResponse(200, null, "Password reset email sent"));
+    .json(new ApiResponse(200, null, "If an account exists, a reset link was sent"));
 });
 
 export const resetPasswordController = asyncHandler(async (req, res) => {
@@ -246,17 +251,11 @@ export const googleCallbackController = asyncHandler(
       });
     }
 
-    const { accessToken } = await generateAccessAndRefreshTokens(
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
       user._id.toString(),
     );
-    const safeUser = await User.findById(user._id).select(
-      "-passwordHash -refreshTokenHash",
-    );
-
-    // Redirect to frontend with token in URL — frontend picks it up
-    const frontendURL = process.env.CORS_ORIGIN || "http://localhost:5173";
-    res.redirect(
-      `${frontendURL}/oauth/callback?token=${accessToken}&user=${encodeURIComponent(JSON.stringify(safeUser))}`,
-    );
+    setAuthCookies(res, accessToken, refreshToken);
+    const frontendURL = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || "http://localhost:5173";
+    res.redirect(`${frontendURL}/oauth/callback`);
   },
 );
