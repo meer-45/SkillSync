@@ -25,11 +25,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (localStorage.getItem("accessToken")) {
-      fetchUser();
-    } else {
-      setLoading(false);
-    }
+    fetchUser();
   }, [fetchUser]);
 
   const login = (userData) => setUser(userData);

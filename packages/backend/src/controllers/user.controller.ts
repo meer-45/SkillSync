@@ -49,11 +49,15 @@ export const deleteUserController = asyncHandler(async (req, res) => {
 });
 
 export const searchUsersController = asyncHandler(async (req, res) => {
-  const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const query = typeof req.query.q === "string"
+    ? req.query.q.trim().slice(0, 50)
+    : "";
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const users = await User.find({
+    _id: { $ne: req.user!._id },
     $or: [
-      { fullName: { $regex: query, $options: "i" } },
-      { username: { $regex: query, $options: "i" } },
+      { fullName: { $regex: escapedQuery, $options: "i" } },
+      { username: { $regex: escapedQuery, $options: "i" } },
     ],
   }).select("_id fullName username avatar").limit(20);
   return res.status(200).json(new ApiResponse(200, users, "Users found"));
@@ -64,21 +68,23 @@ export const deleteCurrentUserController = asyncHandler(async (req, res) => {
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      await Promise.all([
-        UserSkill.deleteMany({ userId }).session(session),
-        Wallet.deleteOne({ userId }).session(session),
-        Progress.deleteOne({ userId }).session(session),
-        UserBadge.deleteMany({ user: userId }).session(session),
-        Notification.deleteMany({ userId }).session(session),
-        Request.deleteMany({ $or: [{ fromUserId: userId }, { toUserId: userId }] }).session(session),
-        Feedback.deleteMany({ $or: [{ fromUser: userId }, { toUser: userId }] }).session(session),
-        Session.updateMany(
-          { $or: [{ teacherId: userId }, { learnerId: userId }], status: "scheduled" },
-          { $set: { status: "cancelled" } },
-          { session },
-        ),
-        User.deleteOne({ _id: userId }).session(session),
-      ]);
+      await UserSkill.deleteMany({ userId }).session(session);
+      await Wallet.deleteOne({ userId }).session(session);
+      await Progress.deleteOne({ userId }).session(session);
+      await UserBadge.deleteMany({ user: userId }).session(session);
+      await Notification.deleteMany({ userId }).session(session);
+      await Request.deleteMany({
+        $or: [{ fromUserId: userId }, { toUserId: userId }],
+      }).session(session);
+      await Feedback.deleteMany({
+        $or: [{ fromUser: userId }, { toUser: userId }],
+      }).session(session);
+      await Session.updateMany(
+        { $or: [{ teacherId: userId }, { learnerId: userId }], status: "scheduled" },
+        { $set: { status: "cancelled" } },
+        { session },
+      );
+      await User.deleteOne({ _id: userId }).session(session);
     });
   } finally {
     await session.endSession();

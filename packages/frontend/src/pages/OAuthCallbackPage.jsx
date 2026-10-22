@@ -8,13 +8,18 @@ const OAuthCallbackPage = () => {
   const { login } = useAuth();
 
   useEffect(() => {
-    API.get("/auth/current-user")
+    API.post("/auth/refresh-token")
+      .then((response) => {
+        const accessToken = response.data.data.accessToken;
+        localStorage.setItem("accessToken", accessToken);
+        return API.get("/auth/current-user");
+      })
       .then((response) => {
         login(response.data.data);
         navigate("/dashboard", { replace: true });
       })
       .catch(() => navigate("/login", { replace: true }));
-  }, []);
+  }, [login, navigate]);
 
   return (
     <div

@@ -210,45 +210,66 @@ export const updateSessionService = async (
   if (status === "completed" && existing.learnerId.toString() !== userId.toString()) {
     throw new ApiError(403, "Only the learner can complete a session");
   }
-  const session = await Session.findOneAndUpdate(
-    { _id: sessionId, status: "scheduled" },
-    { $set: { status } },
-    { new: true },
-  );
-  if (!session) throw new ApiError(409, "Session was already updated");
+  if (status === "completed" && Date.now() < existing.endTime.getTime()) {
+    throw new ApiError(400, "Session can only be completed after it ends");
+  }
 
   if (status === "completed") {
     const dbSession = await mongoose.startSession();
+    let completedSession: SessionDocument;
     try {
-      await dbSession.withTransaction(() => handleSessionCompletion(session, dbSession));
+      completedSession = await dbSession.withTransaction(async () => {
+        const session = await Session.findOneAndUpdate(
+          { _id: sessionId, status: "scheduled" },
+          { $set: { status: "completed" } },
+          { new: true, session: dbSession },
+        );
+        if (!session) throw new ApiError(409, "Session was already updated");
+        await handleSessionCompletion(session, dbSession);
+        return session;
+      });
     } finally {
       await dbSession.endSession();
     }
     try {
       await Promise.all([
-        syncBadges(session.teacherId.toString()),
-        syncBadges(session.learnerId.toString()),
+        syncBadges(completedSession.teacherId.toString()),
+        syncBadges(completedSession.learnerId.toString()),
         createNotification({
-          userId: session.teacherId,
-          type: "session_completed",
-          message: "Session completed! Don't forget to rate your experience ⭐",
-          link: "/sessions",
-          fromUser: session.learnerId,
+          userId: completedSession.teacherId,
+          type: "tokens_earned",
+          message: `You earned tokens for completing a session! 🎉`,
+          link: "/wallet",
+          fromUser: completedSession.learnerId,
         }),
         createNotification({
-          userId: session.learnerId,
+          userId: completedSession.teacherId,
           type: "session_completed",
           message: "Session completed! Don't forget to rate your experience ⭐",
           link: "/sessions",
-          fromUser: session.teacherId,
+          fromUser: completedSession.learnerId,
+        }),
+        createNotification({
+          userId: completedSession.learnerId,
+          type: "session_completed",
+          message: "Session completed! Don't forget to rate your experience ⭐",
+          link: "/sessions",
+          fromUser: completedSession.teacherId,
         }),
       ]);
     } catch (error) {
       console.error("Session completion side effects failed:", error);
     }
+    return completedSession;
   }
 
   if (status === "cancelled") {
+    const session = await Session.findOneAndUpdate(
+      { _id: sessionId, status: "scheduled" },
+      { $set: { status: "cancelled" } },
+      { new: true },
+    );
+    if (!session) throw new ApiError(409, "Session was already updated");
     const otherId =
       session.teacherId.toString() === userId.toString()
         ? session.learnerId
@@ -261,9 +282,10 @@ export const updateSessionService = async (
       link: "/sessions",
       fromUser: userId,
     });
+    return session;
   }
 
-  return session;
+  throw new ApiError(400, "Invalid session status");
 };
 
 export const deleteSessionService = async (
